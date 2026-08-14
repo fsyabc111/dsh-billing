@@ -91,7 +91,6 @@ const messageUsage = (t, turn, step, usage) => ({
   ]);
   const keys = Object.keys(v.perModel).sort();
   assert.deepStrictEqual(keys, ["deepseek-official/deepseek-v4-flash", "deepseek-official/deepseek-v4-pro"]);
-  // flash input 1.5 + pro input 4.5
   assert.ok(Math.abs(v.cost - 6.0) < 1e-9, `mixed cost=${v.cost}`);
   console.log("per-model OK:", keys);
 }
@@ -105,6 +104,38 @@ const messageUsage = (t, turn, step, usage) => ({
   assert.ok(Math.abs(v.cost - 1.5) < 1e-9, `fallback cost=${v.cost}`);
   assert.deepStrictEqual(Object.keys(v.perModel), ["deepseek-official/deepseek-chat"]);
   console.log("fallback OK");
+}
+
+// 7. turns breakdown: per-turn + per-step + peak flags + reasoning
+{
+  const v = run([
+    header(OFF_PEAK),
+    chunkUsage(OFF_PEAK, 1, 1, { inputTokens: 1_000_000, outputTokens: 1_000_000, reasoningTokens: 500_000 }),
+    messageUsage(OFF_PEAK, 1, 1, { inputTokens: 1_000_000, outputTokens: 1_000_000, reasoningTokens: 500_000 }),
+    messageUsage(PEAK, 2, 1, { inputTokens: 1_000_000, outputTokens: 0 }),
+    messageUsage(PEAK, 2, 2, { inputTokens: 1_000_000, outputTokens: 0 }),
+  ]);
+  assert.strictEqual(v.turns.length, 2, "two turns");
+  const t1 = v.turns[0];
+  const t2 = v.turns[1];
+  assert.strictEqual(t1.turn, 1);
+  assert.strictEqual(t1.model, "deepseek-v4-flash");
+  assert.strictEqual(t1.steps.length, 1, "turn 1 deduped to one step");
+  assert.strictEqual(t1.steps[0].peak, false);
+  assert.ok(Math.abs(t1.cost - 6.0) < 1e-9, `turn1 cost=${t1.cost}`);
+  assert.strictEqual(t1.reasoningTokens, 500_000);
+  assert.ok(Math.abs(t1.peakCost - 0) < 1e-9);
+  assert.ok(Math.abs(t1.offPeakCost - 6.0) < 1e-9);
+
+  assert.strictEqual(t2.turn, 2);
+  assert.strictEqual(t2.steps.length, 2);
+  assert.strictEqual(t2.steps[0].peak, true);
+  assert.strictEqual(t2.steps[1].peak, true);
+  assert.ok(Math.abs(t2.cost - 6.0) < 1e-9, `turn2 cost=${t2.cost}`);
+  assert.ok(Math.abs(t2.peakCost - 6.0) < 1e-9);
+
+  assert.strictEqual(v.reasoningTokens, 500_000);
+  console.log("turns breakdown OK");
 }
 
 console.log("ALL TESTS PASSED");
