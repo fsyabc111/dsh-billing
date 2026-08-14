@@ -12,12 +12,20 @@ DeepSeek Harness 计费插件：按所选模型计算当前会话花费（人民
 
 ## 安装
 
-```powershell
-# 在插件仓库所在目录（或绝对/相对路径均可）
-dsh plugin --profile web add link:../dsh-billing
+```sh
+# 在插件仓库根目录执行。link: 依赖不会替被链接的仓库安装依赖，
+# 因此必须先安装本插件声明的运行时依赖（包括 zod）。
+cd /path/to/dsh-billing
+pnpm install --frozen-lockfile
+
+# dsh plugin 会在 profile 目录中运行 pnpm；使用绝对路径，避免 link:
+# 相对路径被按 profile 目录解析。
+dsh plugin --profile web add "link:$PWD"
+dsh web
 ```
 
-重启 `dsh web` 后生效。
+之后重启 `dsh web` 即可生效。更新本插件的依赖或切换分支后，重新执行
+`pnpm install --frozen-lockfile`。
 
 ## 配置
 
