@@ -14,11 +14,11 @@ function run(events) {
 const OFF_PEAK = Date.UTC(2026, 7, 18, 12, 0, 0);
 const PEAK = Date.UTC(2026, 7, 18, 2, 0, 0);
 
-const header = (t) => ({
+const header = (t, model = "deepseek-v4-flash") => ({
   type: "request/header",
   seq: 0,
   time: t,
-  data: { header: { config: { provider: "deepseek-official", model: "deepseek-v4-flash" } } },
+  data: { header: { config: { provider: "deepseek-official", model } } },
 });
 
 const chunkUsage = (t, turn, step, usage) => ({
@@ -35,7 +35,7 @@ const messageUsage = (t, turn, step, usage) => ({
   data: { turn, step, usage },
 });
 
-// 1. off-peak cost: flash off-peak input 0.22/M, output 0.66/M, CNY rate 7.2
+// 1. off-peak flash: input 1.5/M, output 4.5/M (CNY)
 {
   const v = run([
     header(OFF_PEAK),
@@ -43,23 +43,32 @@ const messageUsage = (t, turn, step, usage) => ({
   ]);
   assert.strictEqual(v.inputTokens, 1_000_000);
   assert.strictEqual(v.outputTokens, 1_000_000);
-  assert.ok(Math.abs(v.costUsd - (0.22 + 0.66)) < 1e-9, `costUsd=${v.costUsd}`);
-  assert.ok(Math.abs(v.cost - (0.88 * 7.2)) < 1e-9, `cost=${v.cost}`);
+  assert.ok(Math.abs(v.cost - 6.0) < 1e-9, `cost=${v.cost}`);
   assert.strictEqual(v.currency, "CNY");
-  console.log("off-peak OK:", JSON.stringify({ costUsd: v.costUsd, cost: v.cost }));
+  console.log("off-peak OK:", v.cost);
 }
 
-// 2. peak cost: flash peak input 0.44/M, output 1.32/M
+// 2. peak flash: input 3.0/M, output 9.0/M
 {
   const v = run([
     header(PEAK),
     messageUsage(PEAK, 1, 1, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
   ]);
-  assert.ok(Math.abs(v.costUsd - (0.44 + 1.32)) < 1e-9, `peak costUsd=${v.costUsd}`);
-  console.log("peak OK:", JSON.stringify({ costUsd: v.costUsd, cost: v.cost }));
+  assert.ok(Math.abs(v.cost - 12.0) < 1e-9, `peak cost=${v.cost}`);
+  console.log("peak OK:", v.cost);
 }
 
-// 3. dedupe: chunk usage then message usage for same (turn, step) must NOT double count
+// 3. cache hit pricing: cacheRead uses the (cheap) cache-hit price
+{
+  const v = run([
+    header(OFF_PEAK),
+    messageUsage(OFF_PEAK, 1, 1, { inputTokens: 0, cacheReadTokens: 1_000_000, outputTokens: 0 }),
+  ]);
+  assert.ok(Math.abs(v.cost - 0.05) < 1e-9, `cacheHit cost=${v.cost}`);
+  console.log("cache-hit OK:", v.cost);
+}
+
+// 4. dedupe: chunk then message for same (turn, step) must NOT double count
 {
   const v = run([
     header(OFF_PEAK),
@@ -68,31 +77,32 @@ const messageUsage = (t, turn, step, usage) => ({
   ]);
   assert.strictEqual(v.inputTokens, 1_000_000, "dedupe input");
   assert.strictEqual(v.outputTokens, 1_000_000, "dedupe output");
+  assert.ok(Math.abs(v.cost - 6.0) < 1e-9, "dedupe cost");
   console.log("dedupe OK");
 }
 
-// 4. per-model breakdown: two different models in one session
+// 5. per-model breakdown: flash + pro in one session
 {
   const v = run([
     header(OFF_PEAK),
     messageUsage(OFF_PEAK, 1, 1, { inputTokens: 1_000_000, outputTokens: 0 }),
-    { type: "request/header", seq: 0, time: OFF_PEAK, data: { header: { config: { provider: "deepseek-official", model: "deepseek-v4-pro" } } } },
+    header(OFF_PEAK, "deepseek-v4-pro"),
     messageUsage(OFF_PEAK, 2, 1, { inputTokens: 1_000_000, outputTokens: 0 }),
   ]);
-  const keys = Object.keys(v.perModel);
-  assert.deepStrictEqual(keys.sort(), ["deepseek-official/deepseek-v4-flash", "deepseek-official/deepseek-v4-pro"]);
-  // flash input 0.22, pro input 0.66
-  assert.ok(Math.abs(v.costUsd - (0.22 + 0.66)) < 1e-9, `mixed costUsd=${v.costUsd}`);
+  const keys = Object.keys(v.perModel).sort();
+  assert.deepStrictEqual(keys, ["deepseek-official/deepseek-v4-flash", "deepseek-official/deepseek-v4-pro"]);
+  // flash input 1.5 + pro input 4.5
+  assert.ok(Math.abs(v.cost - 6.0) < 1e-9, `mixed cost=${v.cost}`);
   console.log("per-model OK:", keys);
 }
 
-// 5. unknown model falls back to flash price
+// 6. unknown model falls back to flash price
 {
   const v = run([
-    { type: "request/header", seq: 0, time: OFF_PEAK, data: { header: { config: { provider: "deepseek-official", model: "deepseek-chat" } } } },
+    header(OFF_PEAK, "deepseek-chat"),
     messageUsage(OFF_PEAK, 1, 1, { inputTokens: 1_000_000, outputTokens: 0 }),
   ]);
-  assert.ok(Math.abs(v.costUsd - 0.22) < 1e-9, `fallback costUsd=${v.costUsd}`);
+  assert.ok(Math.abs(v.cost - 1.5) < 1e-9, `fallback cost=${v.cost}`);
   assert.deepStrictEqual(Object.keys(v.perModel), ["deepseek-official/deepseek-chat"]);
   console.log("fallback OK");
 }

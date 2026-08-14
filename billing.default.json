@@ -1,6 +1,5 @@
 {
   "currency": "CNY",
-  "exchangeRateUsdToCny": 7.2,
   "priceModel": "peak-off-peak",
   "peakWindowsUtc": [
     { "start": "01:00", "end": "04:00" },
@@ -12,14 +11,12 @@
   "logging": { "enabled": false, "dir": "billing-logs" },
   "models": {
     "deepseek-official/deepseek-v4-flash": {
-      "peak":    { "input": 0.44, "cacheRead": 0.014, "output": 1.32, "cacheWrite": 0 },
-      "offPeak": { "input": 0.22, "cacheRead": 0.007, "output": 0.66, "cacheWrite": 0 },
-      "flat":    { "input": 0.14, "cacheRead": 0.0028, "output": 0.28, "cacheWrite": 0 }
+      "peak":    { "input": 3.0, "cacheRead": 0.10, "output": 9.0, "cacheWrite": 0 },
+      "offPeak": { "input": 1.5, "cacheRead": 0.05, "output": 4.5, "cacheWrite": 0 }
     },
     "deepseek-official/deepseek-v4-pro": {
-      "peak":    { "input": 1.32, "cacheRead": 0.044, "output": 3.96, "cacheWrite": 0 },
-      "offPeak": { "input": 0.66, "cacheRead": 0.022, "output": 1.98, "cacheWrite": 0 },
-      "flat":    { "input": 0.435, "cacheRead": 0.003625, "output": 0.87, "cacheWrite": 0 }
+      "peak":    { "input": 9.0, "cacheRead": 0.30, "output": 27.0, "cacheWrite": 0 },
+      "offPeak": { "input": 4.5, "cacheRead": 0.15, "output": 13.5, "cacheWrite": 0 }
     }
   }
 }

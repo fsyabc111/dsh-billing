@@ -4,7 +4,6 @@ declare module "@deepseek-ai/dsh-session-projection/types" {
       currency: string;
       displayDecimals: number;
       cost: number;
-      costUsd: number;
       inputTokens: number;
       outputTokens: number;
       cacheReadTokens: number;
@@ -13,7 +12,6 @@ declare module "@deepseek-ai/dsh-session-projection/types" {
         string,
         {
           cost: number;
-          costUsd: number;
           inputTokens: number;
           outputTokens: number;
           cacheReadTokens: number;
