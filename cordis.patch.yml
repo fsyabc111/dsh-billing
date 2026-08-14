@@ -1,0 +1,4 @@
+- insert:
+    - id: billing
+      name: '@deepseek-ai/dsh-billing'
+      inject: [sessionProjections]
